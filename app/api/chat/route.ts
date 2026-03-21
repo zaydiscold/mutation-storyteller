@@ -1,4 +1,4 @@
-import { streamText, tool } from 'ai';
+import { streamText, tool, stepCountIs } from 'ai';
 import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
@@ -23,11 +23,11 @@ export async function POST(req: Request) {
     model: MODEL,
     system: SYSTEM_PROMPT,
     messages,
-    maxSteps: 8,
+    stopWhen: stepCountIs(8),
     tools: {
       searchUniprot: tool({
         description: 'Search UniProt for protein information by gene name',
-        parameters: z.object({
+        inputSchema: z.object({
           geneName: z.string().describe('Gene symbol like TREM2, BRCA1, TP53'),
         }),
         execute: async ({ geneName }) => {
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
       fetchAlphaFold: tool({
         description: 'Fetch AlphaFold predicted 3D structure for a UniProt accession',
-        parameters: z.object({
+        inputSchema: z.object({
           uniprotAccession: z.string().describe('UniProt accession like Q9NZC2'),
         }),
         execute: async ({ uniprotAccession }) => {
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
 
       searchPubMed: tool({
         description: 'Search PubMed for recent papers about a gene and variant',
-        parameters: z.object({
+        inputSchema: z.object({
           query: z.string().describe('Search query like "TREM2 R47H Alzheimer"'),
         }),
         execute: async ({ query }) => {
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
 
       searchClinVar: tool({
         description: 'Search ClinVar for clinical significance of a genetic variant',
-        parameters: z.object({
+        inputSchema: z.object({
           geneName: z.string().describe('Gene symbol'),
           variant: z.string().describe('Variant like R47H, C61G'),
         }),
@@ -161,5 +161,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }

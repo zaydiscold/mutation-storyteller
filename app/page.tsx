@@ -1,6 +1,6 @@
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { useEffect, useState } from 'react';
 import { ProteinViewer } from '@/components/ProteinViewer';
 
@@ -18,6 +18,13 @@ const EXAMPLES = [
   { label: 'CFTR F508del', subtitle: 'Cystic Fibrosis' },
 ];
 
+function getTextFromParts(parts: Array<{ type: string; text?: string }>): string {
+  return parts
+    .filter((p) => p.type === 'text' && p.text)
+    .map((p) => p.text!)
+    .join('');
+}
+
 function extractViewerConfig(content: string): ViewerConfig | null {
   const match = content.match(/\{"viewer":\s*\{[^}]+\}\}/);
   if (match) {
@@ -26,24 +33,27 @@ function extractViewerConfig(content: string): ViewerConfig | null {
   return null;
 }
 
+function cleanContent(content: string): string {
+  return content.replace(/```json\s*\{"viewer":[^`]*```/g, '').trim();
+}
+
 export default function Home() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat();
   const [viewerConfig, setViewerConfig] = useState<ViewerConfig | null>(null);
 
   useEffect(() => {
     const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
-    if (lastAssistant?.content) {
-      const config = extractViewerConfig(lastAssistant.content);
-      if (config) setViewerConfig(config);
+    if (lastAssistant) {
+      const text = getTextFromParts(lastAssistant.parts as Array<{ type: string; text?: string }>);
+      if (text) {
+        const config = extractViewerConfig(text);
+        if (config) setViewerConfig(config);
+      }
     }
   }, [messages]);
 
   const handleExample = (query: string) => {
     append({ role: 'user', content: query });
-  };
-
-  const cleanContent = (content: string) => {
-    return content.replace(/```json\s*\{"viewer":[^`]*```/g, '').trim();
   };
 
   return (
@@ -73,17 +83,20 @@ export default function Home() {
             )}
 
             <div className="flex-1 space-y-4 mb-4 overflow-y-auto max-h-[600px]">
-              {messages.map((m) => (
-                <div key={m.id} className={m.role === 'user' ? 'text-right' : ''}>
-                  {m.role === 'user' ? (
-                    <div className="inline-block bg-zinc-800 rounded-lg px-4 py-2 text-sm">{m.content}</div>
-                  ) : (
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-                      {cleanContent(m.content)}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {messages.map((m) => {
+                const text = getTextFromParts(m.parts as Array<{ type: string; text?: string }>);
+                return (
+                  <div key={m.id} className={m.role === 'user' ? 'text-right' : ''}>
+                    {m.role === 'user' ? (
+                      <div className="inline-block bg-zinc-800 rounded-lg px-4 py-2 text-sm">{text}</div>
+                    ) : (
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+                        {cleanContent(text)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {isLoading && <div className="text-zinc-500 text-sm animate-pulse">Researching...</div>}
             </div>
 
