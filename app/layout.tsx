@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
+      <body className="bg-black text-white antialiased">
+        {children}
         <Script src="https://3Dmol.org/build/3Dmol-min.js" strategy="beforeInteractive" />
-      </head>
-      <body className="bg-black text-white antialiased">{children}</body>
+      </body>
     </html>
   );
 }
