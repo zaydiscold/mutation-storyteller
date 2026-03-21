@@ -155,7 +155,7 @@ export function ProteinViewer({ config, secretMode = false }: { config: ViewerCo
 
   return (
     <div className="viewer-container">
-      <div ref={viewerRef} style={{ position: 'absolute', inset: 0 }} />
+      <div ref={viewerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden' }} />
       {secretMode && (
         <div style={{
           pointerEvents: 'none',
