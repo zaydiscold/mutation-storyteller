@@ -102,12 +102,12 @@ body::before {
     background-size: 200px 200px;
 }
 
-/* lowercase only on UI chrome — NOT on body/academic content */
+/* keep native casing in UI controls */
 button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-    text-transform: lowercase;
+    text-transform: none;
 }
 
 input:not([type="button"]):not([type="submit"]):not([type="reset"]),

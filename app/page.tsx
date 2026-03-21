@@ -152,17 +152,17 @@ export default function Home() {
         {/* header */}
         <div className="animate-entrance animate-delay-1" style={{ textAlign: 'center', marginBottom: '32px' }}>
           <h1 style={{ marginBottom: '8px' }}>
-            mutation storyteller<span className="hero-cursor" />
+            Mutation Storyteller<span className="hero-cursor" />
           </h1>
           <p style={{ color: 'var(--muted)', fontSize: '1.1em', margin: 0 }}>
-            type a mutation. see the protein. understand the science.
+            Type a mutation. See the protein. Understand the science.
           </p>
           <p style={{ color: 'var(--faded)', fontSize: '0.85em', marginTop: '6px', maxWidth: '860px', marginInline: 'auto' }}>
-            rosie was diagnosed with a severe tumor and an ai-assisted vaccine design process helped accelerate the path to treatment.
-            this interface is built to make the early biomolecular research steps understandable and accessible for more people.
+            Rosie was diagnosed with a severe tumor and an AI-assisted vaccine design process helped accelerate the path to treatment.
+            This interface is built to make early biomolecular research steps understandable and accessible for more people.
           </p>
           <p style={{ color: 'var(--faded)', fontSize: '0.8em', marginTop: '6px' }}>
-            powered by alphafold + gemini
+            Powered by AlphaFold + Gemini
           </p>
           {secretMode && (
             <p style={{
@@ -172,7 +172,7 @@ export default function Home() {
               letterSpacing: '0.25em',
               fontWeight: 'bold',
             }}>
-              radio mode active
+              Radio Mode Active
             </p>
           )}
         </div>
@@ -227,7 +227,7 @@ export default function Home() {
               {/* example buttons */}
               {messages.length === 0 && (
                 <div style={{ marginBottom: '20px' }}>
-                  <p style={{ color: 'var(--muted)', fontSize: '0.85em', marginBottom: '10px' }}>try one of these:</p>
+                  <p style={{ color: 'var(--muted)', fontSize: '0.85em', marginBottom: '10px' }}>Try one of these:</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {EXAMPLES.map((ex) => (
                       <button
@@ -265,7 +265,7 @@ export default function Home() {
                     </div>
                   );
                 })}
-                {isLoading && <div className="message-loading">researching...</div>}
+                {isLoading && <div className="message-loading">Researching...</div>}
                 {error && (
                   <div className="message-error">{error.message}</div>
                 )}
@@ -276,11 +276,11 @@ export default function Home() {
                 <input
                   value={input}
                   onChange={handleInputChange}
-                  placeholder="enter a mutation (e.g., trem2 r47h)"
+                  placeholder="Enter a mutation (e.g., TREM2 R47H)"
                   className="archive-input"
                 />
                 <button type="submit" disabled={isLoading} className="archive-submit">
-                  go
+                  Go
                 </button>
               </form>
             </div>
@@ -290,7 +290,7 @@ export default function Home() {
               <ProteinViewer config={viewerConfig} secretMode={secretMode} />
               {viewerConfig && (
                 <p className="viewer-source">
-                  source: alphafold db | residue {viewerConfig.highlightResidue} highlighted
+                  Source: AlphaFold DB | Residue {viewerConfig.highlightResidue} highlighted
                 </p>
               )}
             </div>
@@ -299,7 +299,7 @@ export default function Home() {
 
         {/* footer */}
         <div className="archive-footer">
-          not medical advice. data from uniprot, alphafold, pubmed, clinvar.
+          Not medical advice. Data from UniProt, AlphaFold, PubMed, ClinVar.
         </div>
       </div>
     </main>
