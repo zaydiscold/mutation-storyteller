@@ -3,8 +3,24 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'mutation storyteller',
-  description: 'understand any genetic mutation in plain language. powered by alphafold + gemini.',
+  title: 'Mutation Storyteller',
+  description: 'Understand any genetic mutation in plain language. Powered by AlphaFold + Gemini.',
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
+  },
+  openGraph: {
+    title: 'Mutation Storyteller',
+    description: 'Type a mutation. See the protein. Understand the science.',
+    images: ['/icon.png'],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Mutation Storyteller',
+    description: 'Type a mutation. See the protein. Understand the science.',
+    images: ['/icon.png'],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
