@@ -6,11 +6,11 @@ import { SYSTEM_PROMPT } from '@/lib/prompts';
 export const maxDuration = 60;
 
 // ============================================================
-// MODEL SWITCH — change this one line to swap Gemini models
+// MODEL SWITCH — uncomment the one you want
 // ============================================================
-const MODEL = google('gemini-2.5-flash-preview-05-20');
-// const MODEL = google('gemini-2.0-flash');
-// const MODEL = google('gemini-3.1-pro');
+const MODEL = google('gemini-2.5-flash');        // stable GA, best for tool calling
+// const MODEL = google('gemini-2.0-flash');      // fallback, still works
+// const MODEL = google('gemini-2.5-pro');         // heavier, more capable
 // ============================================================
 
 export async function POST(req: Request) {
