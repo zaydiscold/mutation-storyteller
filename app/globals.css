@@ -73,7 +73,6 @@
    -------------------------------------------------------------------------- */
 html {
     scroll-behavior: smooth;
-    text-transform: lowercase;
     overflow-x: hidden;
 }
 
@@ -103,7 +102,7 @@ body::before {
     background-size: 200px 200px;
 }
 
-/* global lowercase enforcement */
+/* lowercase only on UI chrome — NOT on body/academic content */
 button,
 input[type="button"],
 input[type="submit"],
@@ -416,6 +415,72 @@ input[type="submit"]:active {
     height: 3px;
     background: var(--accent);
     box-shadow: 0 0 3px var(--accent-glow);
+}
+
+/* --------------------------------------------------------------------------
+   RESEARCH TIMELINE
+   -------------------------------------------------------------------------- */
+.timeline-step {
+    border: 1px solid var(--ink);
+    background: var(--card);
+    padding: 12px 14px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.timeline-bar {
+    height: 5px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+    background: rgba(0,0,0,0.08);
+    transition: background 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* completed: solid purple */
+.timeline-step.completed .timeline-bar {
+    background: #7B5EA7;
+}
+
+.timeline-step.completed {
+    border-color: #7B5EA7;
+}
+
+.timeline-step.completed .timeline-title {
+    color: #7B5EA7;
+}
+
+/* active/loading: animated orange stripe */
+.timeline-step.active .timeline-bar {
+    background:
+        linear-gradient(90deg, transparent 0%, #FF8040 40%, #FFa060 60%, transparent 100%)
+        0 0 / 200% 100%;
+    animation: timeline-loading 1.5s ease-in-out infinite;
+}
+
+.timeline-step.active {
+    border-color: #FF8040;
+    background: rgba(255, 128, 64, 0.06);
+}
+
+@keyframes timeline-loading {
+    0%   { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.timeline-title {
+    font-size: 0.88em;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0;
+}
+
+.timeline-subtitle {
+    font-size: 0.75em;
+    color: var(--faded);
+    margin: 4px 0 0;
 }
 
 /* --------------------------------------------------------------------------

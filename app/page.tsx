@@ -12,6 +12,15 @@ const EXAMPLES = [
   { label: 'CFTR F508del', subtitle: 'Cystic Fibrosis' },
 ];
 
+const TIMELINE_STOPS = [
+  { id: 'submitted', title: 'Mutation Submitted', subtitle: 'Input parsed and normalized' },
+  { id: 'uniprot', title: 'UniProt Lookup', subtitle: 'Protein identity and function context' },
+  { id: 'alphafold', title: 'AlphaFold Structure', subtitle: '3D model selected and loaded' },
+  { id: 'pubmed', title: 'PubMed Scan', subtitle: 'Recent literature attached' },
+  { id: 'clinvar', title: 'ClinVar Evidence', subtitle: 'Clinical significance reviewed' },
+  { id: 'synthesis', title: 'Story Synthesis', subtitle: 'Narrative with citations generated' },
+];
+
 function getTextFromParts(parts: Array<{ type: string; text?: string }>): string {
   return parts
     .filter((p) => p.type === 'text' && p.text)
@@ -43,6 +52,7 @@ export default function Home() {
   } = useChat({ streamProtocol: 'text' });
   const [secretMode, setSecretMode] = useState(false);
   const [secretIndex, setSecretIndex] = useState(0);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
 
   useEffect(() => {
     let buffer = '';
@@ -66,6 +76,17 @@ export default function Home() {
     }, 5500);
     return () => window.clearInterval(timer);
   }, [secretMode]);
+
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setLoadingSeconds((Date.now() - startedAt) / 1000);
+    }, 300);
+
+    return () => window.clearInterval(timer);
+  }, [isLoading]);
 
   const activeUserMutation = useMemo(() => {
     const lastUser = [...messages].reverse().find((message) => message.role === 'user');
@@ -100,6 +121,27 @@ export default function Home() {
     return parsedConfig;
   }, [activeUserMutation, messages, secretIndex, secretMode]);
 
+  const timelineState = useMemo(() => {
+    const hasUserMessage = messages.some((message) => message.role === 'user');
+    const hasAssistantMessage = messages.some((message) => message.role === 'assistant');
+    const maxIndex = TIMELINE_STOPS.length - 1;
+
+    if (!hasUserMessage) {
+      return { completedIndex: -1, activeIndex: -1 };
+    }
+
+    if (isLoading) {
+      const completedIndex = Math.min(maxIndex - 1, Math.floor(loadingSeconds / 3));
+      return { completedIndex, activeIndex: Math.min(maxIndex, completedIndex + 1) };
+    }
+
+    if (hasAssistantMessage) {
+      return { completedIndex: maxIndex, activeIndex: -1 };
+    }
+
+    return { completedIndex: 0, activeIndex: 1 };
+  }, [isLoading, loadingSeconds, messages]);
+
   const handleExample = (query: string) => {
     append({ role: 'user', content: query });
   };
@@ -115,7 +157,11 @@ export default function Home() {
           <p style={{ color: 'var(--muted)', fontSize: '1.1em', margin: 0 }}>
             type a mutation. see the protein. understand the science.
           </p>
-          <p style={{ color: 'var(--faded)', fontSize: '0.8em', marginTop: '4px' }}>
+          <p style={{ color: 'var(--faded)', fontSize: '0.85em', marginTop: '6px', maxWidth: '860px', marginInline: 'auto' }}>
+            rosie was diagnosed with a severe tumor and an ai-assisted vaccine design process helped accelerate the path to treatment.
+            this interface is built to make the early biomolecular research steps understandable and accessible for more people.
+          </p>
+          <p style={{ color: 'var(--faded)', fontSize: '0.8em', marginTop: '6px' }}>
             powered by alphafold + gemini
           </p>
           {secretMode && (
@@ -129,6 +175,52 @@ export default function Home() {
               radio mode active
             </p>
           )}
+        </div>
+
+        <div className="animate-entrance animate-delay-2" style={{
+          marginBottom: '20px',
+          border: '1px solid var(--line)',
+          background: 'var(--chat-bg)',
+          borderRadius: '10px',
+          padding: '14px',
+        }}>
+          <p style={{ color: 'var(--muted)', fontSize: '0.75em', margin: '0 0 10px', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            research timeline
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: '8px' }} className="timeline-grid">
+            {TIMELINE_STOPS.map((stop, index) => {
+              const isCompleted = index <= timelineState.completedIndex;
+              const isActive = index === timelineState.activeIndex;
+              return (
+                <div
+                  key={stop.id}
+                  style={{
+                    border: '1px solid var(--line)',
+                    borderRadius: '8px',
+                    background: 'var(--bg)',
+                    padding: '10px',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '6px',
+                      borderRadius: '999px',
+                      marginBottom: '8px',
+                      background: isCompleted ? 'var(--accent)' : isActive ? '#5cd2ff' : 'var(--line)',
+                      opacity: isActive ? 0.95 : 0.8,
+                    }}
+                  />
+                  <p style={{ margin: 0, color: 'var(--text)', fontSize: '0.88em', fontWeight: 600 }}>{stop.title}</p>
+                  <p style={{ margin: '4px 0 0', color: 'var(--faded)', fontSize: '0.75em' }}>{stop.subtitle}</p>
+                </div>
+              );
+            })}
+          </div>
+          <style>{`
+            @media (min-width: 900px) {
+              .timeline-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+            }
+          `}</style>
         </div>
 
         {/* main grid */}

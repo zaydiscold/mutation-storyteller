@@ -1,9 +1,34 @@
-import { streamText, tool, stepCountIs } from 'ai';
+import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai';
 import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
 
 export const maxDuration = 60;
+
+type UniProtComment = {
+  commentType?: string;
+  texts?: Array<{ value?: string }>;
+  disease?: { diseaseId?: string };
+};
+
+type UniProtProtein = {
+  primaryAccession: string;
+  proteinDescription?: { recommendedName?: { fullName?: { value?: string } } };
+  genes?: Array<{ geneName?: { value?: string } }>;
+  comments?: UniProtComment[];
+  sequence?: { length?: number };
+};
+
+type PubMedSummaryRecord = {
+  title?: string;
+  authors?: Array<{ name?: string }>;
+  source?: string;
+};
+
+type ClinVarSummaryRecord = {
+  title?: string;
+  clinical_significance?: { description?: string };
+};
 
 // ============================================================
 // MODEL SWITCH — uncomment the one you want
@@ -22,7 +47,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: MODEL,
     system: SYSTEM_PROMPT,
-    messages,
+    messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(8),
     tools: {
       searchUniprot: tool({
@@ -32,24 +57,27 @@ export async function POST(req: Request) {
         }),
         execute: async ({ geneName }) => {
           try {
+            const query = `(gene_exact:${geneName} OR gene:${geneName}) AND organism_id:9606 AND reviewed:true`;
             const res = await fetch(
-              `https://rest.uniprot.org/uniprotkb/search?query=${geneName}+AND+organism_id:9606&format=json&size=1`
+              `https://rest.uniprot.org/uniprotkb/search?query=${encodeURIComponent(query)}&format=json&size=1`
             );
             const data = await res.json();
             if (!data.results?.length) return { error: 'Protein not found' };
-            const protein = data.results[0];
+            const protein = data.results[0] as UniProtProtein;
+            const comments = protein.comments ?? [];
+
             return {
               accession: protein.primaryAccession,
               name: protein.proteinDescription?.recommendedName?.fullName?.value,
               gene: protein.genes?.[0]?.geneName?.value,
-              function: protein.comments?.find((c: any) => c.commentType === 'FUNCTION')?.texts?.[0]?.value,
-              diseases: protein.comments?.filter((c: any) => c.commentType === 'DISEASE')?.map((d: any) => ({
-                name: d.disease?.diseaseId,
-                description: d.texts?.[0]?.value,
+              function: comments.find((comment) => comment.commentType === 'FUNCTION')?.texts?.[0]?.value,
+              diseases: comments.filter((comment) => comment.commentType === 'DISEASE').map((disease) => ({
+                name: disease.disease?.diseaseId,
+                description: disease.texts?.[0]?.value,
               })),
               sequenceLength: protein.sequence?.length,
             };
-          } catch (e) {
+          } catch {
             return { error: 'UniProt request failed' };
           }
         },
@@ -73,7 +101,7 @@ export async function POST(req: Request) {
               cifUrl: entry.cifUrl,
               paeImageUrl: entry.paeImageUrl,
             };
-          } catch (e) {
+          } catch {
             return { error: 'AlphaFold request failed' };
           }
         },
@@ -96,19 +124,20 @@ export async function POST(req: Request) {
               `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${ids.join(',')}&retmode=json`
             );
             const summaryData = await summaryRes.json();
+
             return {
               papers: ids.map((id: string) => {
-                const paper = summaryData.result?.[id];
+                const paper = summaryData.result?.[id] as PubMedSummaryRecord | undefined;
                 return {
                   pmid: id,
                   title: paper?.title,
-                  authors: paper?.authors?.slice(0, 3)?.map((a: any) => a.name),
+                  authors: paper?.authors?.slice(0, 3)?.map((author) => author.name),
                   journal: paper?.source,
                   url: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
                 };
               }),
             };
-          } catch (e) {
+          } catch {
             return { papers: [], error: 'PubMed request failed' };
           }
         },
@@ -147,13 +176,14 @@ export async function POST(req: Request) {
               `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id=${ids.join(',')}&retmode=json`
             );
             const summaryData = await summaryRes.json();
+
             return {
               results: ids.map((id: string) => {
-                const record = summaryData.result?.[id];
+                const record = summaryData.result?.[id] as ClinVarSummaryRecord | undefined;
                 return { uid: id, title: record?.title, clinicalSignificance: record?.clinical_significance?.description };
               }),
             };
-          } catch (e) {
+          } catch {
             return { results: [], error: 'ClinVar request failed' };
           }
         },
@@ -161,5 +191,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toTextStreamResponse();
 }
