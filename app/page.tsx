@@ -1,15 +1,9 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ProteinViewer } from '@/components/ProteinViewer';
-
-interface ViewerConfig {
-  pdbUrl: string;
-  highlightResidue: number;
-  chain: string;
-  mutationLabel: string;
-}
+import { DEMO_KEYS, DEMO_MODELS, type ViewerConfig, normalizeMutationQuery } from '@/lib/demo-models';
 
 const EXAMPLES = [
   { label: 'TREM2 R47H', subtitle: "Alzheimer's" },
@@ -38,91 +32,200 @@ function cleanContent(content: string): string {
 }
 
 export default function Home() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat();
-  const [viewerConfig, setViewerConfig] = useState<ViewerConfig | null>(null);
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    append,
+    error,
+  } = useChat({ streamProtocol: 'text' });
+  const [secretMode, setSecretMode] = useState(false);
+  const [secretIndex, setSecretIndex] = useState(0);
 
   useEffect(() => {
-    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
-    if (lastAssistant) {
-      const text = getTextFromParts(lastAssistant.parts as Array<{ type: string; text?: string }>);
-      if (text) {
-        const config = extractViewerConfig(text);
-        if (config) setViewerConfig(config);
+    let buffer = '';
+    const togglePhrase = 'radio';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.length !== 1) return;
+      buffer = (buffer + event.key.toLowerCase()).slice(-togglePhrase.length);
+      if (buffer === togglePhrase) {
+        setSecretMode((current) => !current);
       }
-    }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!secretMode) return;
+    const timer = window.setInterval(() => {
+      setSecretIndex((index) => (index + 1) % DEMO_KEYS.length);
+    }, 5500);
+    return () => window.clearInterval(timer);
+  }, [secretMode]);
+
+  const activeUserMutation = useMemo(() => {
+    const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+    if (!lastUser) return null;
+    const userText = getTextFromParts(lastUser.parts as Array<{ type: string; text?: string }>);
+    if (!userText) return null;
+    return normalizeMutationQuery(userText);
   }, [messages]);
+
+  const viewerConfig = useMemo(() => {
+    if (secretMode) {
+      return DEMO_MODELS[DEMO_KEYS[secretIndex]];
+    }
+
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+    const lastAssistantText = lastAssistant
+      ? getTextFromParts(lastAssistant.parts as Array<{ type: string; text?: string }>)
+      : '';
+    const parsedConfig = lastAssistantText ? extractViewerConfig(lastAssistantText) : null;
+
+    if (activeUserMutation && DEMO_MODELS[activeUserMutation]) {
+      const cached = DEMO_MODELS[activeUserMutation];
+      if (!parsedConfig) return cached;
+      return {
+        ...parsedConfig,
+        pdbUrl: cached.pdbUrl,
+        mutationLabel: parsedConfig.mutationLabel || cached.mutationLabel,
+        chain: parsedConfig.chain || cached.chain,
+      };
+    }
+
+    return parsedConfig;
+  }, [activeUserMutation, messages, secretIndex, secretMode]);
 
   const handleExample = (query: string) => {
     append({ role: 'user', content: query });
   };
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Mutation Storyteller</h1>
-          <p className="text-zinc-400 text-lg">Type a mutation. See the protein. Understand the science.</p>
-          <p className="text-zinc-600 text-sm mt-1">Powered by AlphaFold + Gemini</p>
+    <main>
+      <div className="archive-container">
+        {/* header */}
+        <div className="animate-entrance animate-delay-1" style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <h1 style={{ marginBottom: '8px' }}>
+            mutation storyteller<span className="hero-cursor" />
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: '1.1em', margin: 0 }}>
+            type a mutation. see the protein. understand the science.
+          </p>
+          <p style={{ color: 'var(--faded)', fontSize: '0.8em', marginTop: '4px' }}>
+            powered by alphafold + gemini
+          </p>
+          {secretMode && (
+            <p style={{
+              color: 'var(--accent)',
+              fontSize: '0.75em',
+              marginTop: '8px',
+              letterSpacing: '0.25em',
+              fontWeight: 'bold',
+            }}>
+              radio mode active
+            </p>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3 flex flex-col">
-            {messages.length === 0 && (
-              <div className="mb-6">
-                <p className="text-zinc-500 text-sm mb-3">Try one of these:</p>
-                <div className="flex flex-wrap gap-2">
-                  {EXAMPLES.map((ex) => (
-                    <button key={ex.label} onClick={() => handleExample(ex.label)}
-                      className="px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg hover:bg-zinc-800 hover:border-zinc-600 transition-colors text-sm">
-                      <span className="font-medium">{ex.label}</span>
-                      <span className="text-zinc-500 ml-2">{ex.subtitle}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 space-y-4 mb-4 overflow-y-auto max-h-[600px]">
-              {messages.map((m) => {
-                const text = getTextFromParts(m.parts as Array<{ type: string; text?: string }>);
-                return (
-                  <div key={m.id} className={m.role === 'user' ? 'text-right' : ''}>
-                    {m.role === 'user' ? (
-                      <div className="inline-block bg-zinc-800 rounded-lg px-4 py-2 text-sm">{text}</div>
-                    ) : (
-                      <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-                        {cleanContent(text)}
-                      </div>
-                    )}
+        {/* main grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: '24px',
+        }}>
+          {/* on large screens: 3/5 chat + 2/5 viewer */}
+          <style>{`
+            @media (min-width: 1024px) {
+              .main-grid { grid-template-columns: 3fr 2fr !important; }
+            }
+          `}</style>
+          <div className="main-grid" style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr',
+            gap: '24px',
+          }}>
+            {/* chat column */}
+            <div className="animate-entrance animate-delay-2" style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* example buttons */}
+              {messages.length === 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ color: 'var(--muted)', fontSize: '0.85em', marginBottom: '10px' }}>try one of these:</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {EXAMPLES.map((ex) => (
+                      <button
+                        key={ex.label}
+                        onClick={() => handleExample(ex.label)}
+                        className="example-btn"
+                      >
+                        <span style={{ fontWeight: 'bold' }}>{ex.label}</span>
+                        <span className="example-subtitle">{ex.subtitle}</span>
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
-              {isLoading && <div className="text-zinc-500 text-sm animate-pulse">Researching...</div>}
+                </div>
+              )}
+
+              {/* messages */}
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '16px',
+                overflowY: 'auto',
+                maxHeight: '600px',
+              }}>
+                {messages.map((m) => {
+                  const text = getTextFromParts(m.parts as Array<{ type: string; text?: string }>);
+                  return (
+                    <div key={m.id} style={m.role === 'user' ? { textAlign: 'right' } : {}}>
+                      {m.role === 'user' ? (
+                        <div className="message-user">{text}</div>
+                      ) : (
+                        <div className="message-assistant">{cleanContent(text)}</div>
+                      )}
+                    </div>
+                  );
+                })}
+                {isLoading && <div className="message-loading">researching...</div>}
+                {error && (
+                  <div className="message-error">{error.message}</div>
+                )}
+              </div>
+
+              {/* input form */}
+              <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="enter a mutation (e.g., trem2 r47h)"
+                  className="archive-input"
+                />
+                <button type="submit" disabled={isLoading} className="archive-submit">
+                  go
+                </button>
+              </form>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex gap-2">
-              <input value={input} onChange={handleInputChange}
-                placeholder="Enter a mutation (e.g., TREM2 R47H)"
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-zinc-500" />
-              <button type="submit" disabled={isLoading}
-                className="px-6 py-3 bg-white text-black rounded-lg font-medium text-sm hover:bg-zinc-200 disabled:opacity-50 transition-colors">
-                Go
-              </button>
-            </form>
-          </div>
-
-          <div className="lg:col-span-2">
-            <ProteinViewer config={viewerConfig} />
-            {viewerConfig && (
-              <p className="text-zinc-600 text-xs mt-2 text-center">
-                Source: AlphaFold DB | Residue {viewerConfig.highlightResidue} highlighted
-              </p>
-            )}
+            {/* viewer column */}
+            <div className="animate-entrance animate-delay-3">
+              <ProteinViewer config={viewerConfig} secretMode={secretMode} />
+              {viewerConfig && (
+                <p className="viewer-source">
+                  source: alphafold db | residue {viewerConfig.highlightResidue} highlighted
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 text-center text-zinc-700 text-xs">
-          Not medical advice. Data from UniProt, AlphaFold, PubMed, ClinVar.
+        {/* footer */}
+        <div className="archive-footer">
+          not medical advice. data from uniprot, alphafold, pubmed, clinvar.
         </div>
       </div>
     </main>

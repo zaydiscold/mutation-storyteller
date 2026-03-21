@@ -1,26 +1,480 @@
+/* ==========================================================================
+   mutation storyteller — "the archive" design language
+   brand identity: zayd.wtf
+   ========================================================================== */
+
 @import "tailwindcss";
 
+/* --------------------------------------------------------------------------
+   DESIGN TOKENS
+   -------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+    /* color palette (light / default) */
+    --paper: #F1E9D2;
+    --card: rgba(255, 255, 255, 0.4);
+    --card-hover: #FFFFFF;
+    --ink: #333333;
+    --muted: #555555;
+    --faded: #666666;
+    --link: #FF8040;
+    --accent: #FF8040;
+    --accent-glow: rgba(255, 116, 51, 0.45);
+    --highlight: rgba(255, 116, 51, 0.25);
+    --selection-bg: rgba(255, 116, 51, 0.3);
+
+    /* shadows (hard-edge, no blur — brutalist) */
+    --shadow: 5px 5px 0px var(--ink);
+    --shadow-sm: 3px 3px 0px var(--ink);
+    --shadow-lg: 8px 8px 0px var(--ink);
+
+    /* typography */
+    --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+    --font-mono: monospace;
+
+    /* spacing */
+    --content-max-width: 900px;
+
+    /* animation */
+    --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* viewer background */
+    --viewer-bg: #F1E9D2;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* dark mode */
+[data-theme="dark"] {
+    --paper: #2a2a2a;
+    --card: rgba(50, 50, 50, 0.6);
+    --card-hover: #3a3a3a;
+    --ink: #F1E9D2;
+    --muted: #c9c1ab;
+    --faded: #888888;
+    --link: #c4b5ff;
+    --accent: #9b7dff;
+    --accent-glow: rgba(155, 125, 255, 0.4);
+    --highlight: rgba(155, 125, 255, 0.2);
+    --selection-bg: rgba(155, 125, 255, 0.3);
+
+    --shadow: 5px 5px 0px rgba(241, 233, 210, 0.7);
+    --shadow-sm: 3px 3px 0px rgba(241, 233, 210, 0.7);
+    --shadow-lg: 8px 8px 0px rgba(241, 233, 210, 0.8);
+
+    --viewer-bg: #2a2a2a;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+::selection {
+    background-color: var(--selection-bg);
+    color: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   BASE STYLES
+   -------------------------------------------------------------------------- */
+html {
+    scroll-behavior: smooth;
+    text-transform: lowercase;
+    overflow-x: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    font: 18px/1.5 var(--font-stack);
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    background-color: var(--paper);
+    position: relative;
+    margin: 0;
+    padding: 0;
+}
+
+/* grain texture overlay */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.80' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+}
+
+/* global lowercase enforcement */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+    text-transform: lowercase;
+}
+
+input:not([type="button"]):not([type="submit"]):not([type="reset"]),
+textarea,
+select {
+    text-transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   TYPOGRAPHY
+   -------------------------------------------------------------------------- */
+h1 {
+    font-size: 2.2em;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5em;
+    color: var(--ink);
+}
+
+/* blinking terminal cursor */
+.hero-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 0.75em;
+    background: var(--accent);
+    margin-left: 3px;
+    vertical-align: baseline;
+    position: relative;
+    top: 0.05em;
+    animation: hero-color-blink 2.4s step-end infinite;
+}
+
+@keyframes hero-color-blink {
+    0%   { background: #FF8040; opacity: 1; }
+    25%  { opacity: 0; }
+    50%  { background: #9b7dff; opacity: 1; }
+    75%  { opacity: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   LINKS
+   -------------------------------------------------------------------------- */
+a {
+    color: var(--link);
+    text-decoration: underline;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   ARCHIVE CARDS
+   -------------------------------------------------------------------------- */
+.archive-card {
+    display: block;
+    background-color: var(--card);
+    border: 1px solid var(--ink);
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: background-color 0.2s var(--ease-out-quint),
+        box-shadow 0.2s var(--ease-out-quint),
+        transform 0.2s var(--ease-out-quint);
+    cursor: pointer;
+    position: relative;
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.archive-card:hover {
+    background-color: var(--card-hover);
+    box-shadow: var(--shadow-lg);
+    transform: translate(-2px, -2px);
+    z-index: 10;
+}
+
+/* physical clack on press */
+.archive-card:active,
+button:active,
+input[type="submit"]:active {
+    box-shadow: none !important;
+    transform: translate(0, 0) !important;
+    transition: all 0.05s ease-out;
+}
+
+.card-title {
+    font-size: 1.3em;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+    color: var(--ink);
+}
+
+.card-meta {
+    padding-top: 12px;
+    border-top: 2px solid var(--ink);
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+/* --------------------------------------------------------------------------
+   EXAMPLE BUTTONS (pill variant of archive card)
+   -------------------------------------------------------------------------- */
+.example-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--card);
+    border: 1px solid var(--ink);
+    font-family: inherit;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.15s var(--ease-out-quint);
+    text-decoration: none;
+}
+
+.example-btn:hover {
+    background: var(--card-hover);
+    box-shadow: var(--shadow-sm);
+    transform: translate(-1px, -1px);
+}
+
+.example-btn:active {
+    box-shadow: none !important;
+    transform: translate(0, 0) !important;
+    transition: all 0.05s ease-out;
+}
+
+.example-btn .example-subtitle {
+    color: var(--muted);
+    font-weight: normal;
+}
+
+/* --------------------------------------------------------------------------
+   CHAT MESSAGES
+   -------------------------------------------------------------------------- */
+.message-user {
+    display: inline-block;
+    background: var(--card);
+    border: 1px solid var(--ink);
+    padding: 10px 16px;
+    font-size: 0.95em;
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+}
+
+.message-assistant {
+    background: var(--card);
+    border: 1px solid var(--ink);
+    padding: 16px 20px;
+    font-size: 0.95em;
+    line-height: 1.6;
+    color: var(--ink);
+    white-space: pre-wrap;
+}
+
+.message-loading {
+    color: var(--muted);
+    font-size: 0.9em;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.message-error {
+    border: 1px solid var(--link);
+    background: rgba(255, 128, 64, 0.08);
+    padding: 12px 16px;
+    font-size: 0.9em;
+    color: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   FORM INPUT
+   -------------------------------------------------------------------------- */
+.archive-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--ink);
+    padding: 12px 16px;
+    font-size: 0.95em;
+    font-family: inherit;
+    color: var(--ink);
+    outline: none;
+    transition: box-shadow 0.15s ease-out;
+}
+
+.archive-input::placeholder {
+    color: var(--muted);
+}
+
+.archive-input:focus {
+    box-shadow: var(--shadow-sm);
+}
+
+.archive-submit {
+    padding: 12px 24px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 1px solid var(--ink);
+    font-family: inherit;
+    font-size: 0.95em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s var(--ease-out-quint);
+}
+
+.archive-submit:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translate(-1px, -1px);
+}
+
+.archive-submit:active {
+    box-shadow: none !important;
+    transform: translate(0, 0) !important;
+}
+
+.archive-submit:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   PROTEIN VIEWER
+   -------------------------------------------------------------------------- */
+.viewer-container {
+    position: relative;
+    width: 100%;
+    height: 500px;
+    background: var(--card);
+    border: 1px solid var(--ink);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.viewer-empty {
+    width: 100%;
+    height: 500px;
+    background: var(--card);
+    border: 1px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+.viewer-source {
+    color: var(--faded);
+    font-size: 0.75em;
+    margin-top: 8px;
+    text-align: center;
+}
+
+/* secret mode equalizer — orange/accent palette */
+.equalizer-bar {
+    width: 6px;
+    border-radius: 1px;
+    background: linear-gradient(to top, var(--accent), var(--link), #ffb366);
+    opacity: 0.9;
+}
+
+/* --------------------------------------------------------------------------
+   MODULE HEADER (accent bar)
+   -------------------------------------------------------------------------- */
+.module-header {
+    font-size: 0.75em;
+    font-weight: bold;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 7px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--ink);
+    position: relative;
+}
+
+.module-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 30px;
+    height: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 3px var(--accent-glow);
+}
+
+/* --------------------------------------------------------------------------
+   FOOTER
+   -------------------------------------------------------------------------- */
+.archive-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ink);
+    text-align: center;
+    font-size: 0.8em;
+    color: var(--faded);
+    opacity: 0.5;
+}
+
+/* --------------------------------------------------------------------------
+   ENTRANCE ANIMATIONS (cinema reveal)
+   -------------------------------------------------------------------------- */
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-entrance {
+    opacity: 0;
+    animation: fadeSlideUp 0.6s var(--ease-out-quint) forwards;
+}
+
+.animate-delay-1 { animation-delay: 0.1s; }
+.animate-delay-2 { animation-delay: 0.2s; }
+.animate-delay-3 { animation-delay: 0.3s; }
+.animate-delay-4 { animation-delay: 0.4s; }
+
+/* --------------------------------------------------------------------------
+   LAYOUT UTILITIES
+   -------------------------------------------------------------------------- */
+.archive-container {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+    padding: 24px 16px;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE
+   -------------------------------------------------------------------------- */
+@media (max-width: 600px) {
+    body {
+        font-size: 16px;
+    }
+
+    h1 {
+        font-size: 1.8em;
+    }
+
+    .viewer-container,
+    .viewer-empty {
+        height: 350px;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   TAILWIND THEME BRIDGE (so tw utilities still work alongside)
+   -------------------------------------------------------------------------- */
+@theme inline {
+    --color-background: var(--paper);
+    --color-foreground: var(--ink);
+    --font-sans: var(--font-stack);
+    --font-mono: var(--font-mono);
 }
