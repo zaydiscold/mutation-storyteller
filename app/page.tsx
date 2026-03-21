@@ -179,39 +179,21 @@ export default function Home() {
 
         <div className="animate-entrance animate-delay-2" style={{
           marginBottom: '20px',
-          border: '1px solid var(--line)',
-          background: 'var(--chat-bg)',
-          borderRadius: '10px',
+          border: '1px solid var(--ink)',
+          background: 'var(--card)',
           padding: '14px',
         }}>
-          <p style={{ color: 'var(--muted)', fontSize: '0.75em', margin: '0 0 10px', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-            research timeline
-          </p>
+          <p className="module-header">RESEARCH TIMELINE</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, minmax(0, 1fr))', gap: '8px' }} className="timeline-grid">
             {TIMELINE_STOPS.map((stop, index) => {
               const isCompleted = index <= timelineState.completedIndex;
               const isActive = index === timelineState.activeIndex;
+              const stepClass = `timeline-step${isCompleted ? ' completed' : ''}${isActive ? ' active' : ''}`;
               return (
-                <div
-                  key={stop.id}
-                  style={{
-                    border: '1px solid var(--line)',
-                    borderRadius: '8px',
-                    background: 'var(--bg)',
-                    padding: '10px',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '6px',
-                      borderRadius: '999px',
-                      marginBottom: '8px',
-                      background: isCompleted ? 'var(--accent)' : isActive ? '#5cd2ff' : 'var(--line)',
-                      opacity: isActive ? 0.95 : 0.8,
-                    }}
-                  />
-                  <p style={{ margin: 0, color: 'var(--text)', fontSize: '0.88em', fontWeight: 600 }}>{stop.title}</p>
-                  <p style={{ margin: '4px 0 0', color: 'var(--faded)', fontSize: '0.75em' }}>{stop.subtitle}</p>
+                <div key={stop.id} className={stepClass}>
+                  <div className="timeline-bar" />
+                  <p className="timeline-title">{stop.title}</p>
+                  <p className="timeline-subtitle">{stop.subtitle}</p>
                 </div>
               );
             })}
