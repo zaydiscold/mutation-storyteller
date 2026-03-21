@@ -8,9 +8,12 @@ export const maxDuration = 60;
 // ============================================================
 // MODEL SWITCH — uncomment the one you want
 // ============================================================
-const MODEL = google('gemini-2.5-flash');        // stable GA, best for tool calling
-// const MODEL = google('gemini-2.0-flash');      // fallback, still works
-// const MODEL = google('gemini-2.5-pro');         // heavier, more capable
+// Gemini 3.1 (latest)
+const MODEL = google('gemini-3.1-pro-preview-customtools'); // best for tool calling + science reasoning
+// const MODEL = google('gemini-3-flash-preview');             // fast, pro-level intelligence
+// const MODEL = google('gemini-3.1-flash-lite-preview');      // cheapest/fastest
+// Gemini 2.x (fallback)
+// const MODEL = google('gemini-2.5-flash');                   // stable GA fallback
 // ============================================================
 
 export async function POST(req: Request) {
