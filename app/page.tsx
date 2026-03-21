@@ -151,8 +151,13 @@ export default function Home() {
       <div className="archive-container">
         {/* header */}
         <div className="animate-entrance animate-delay-1" style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <img
+            src="/icon.png"
+            alt="Mutation Storyteller logo"
+            style={{ width: '80px', height: '80px', marginBottom: '16px', display: 'inline-block' }}
+          />
           <h1 style={{ marginBottom: '8px' }}>
-            Mutation Storyteller<span className="hero-cursor" />
+            mutation storyteller<span className="hero-cursor" />
           </h1>
           <p style={{ color: 'var(--muted)', fontSize: '1.1em', margin: 0 }}>
             Type a mutation. See the protein. Understand the science.
