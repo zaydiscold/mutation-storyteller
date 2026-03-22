@@ -6,8 +6,12 @@ export const metadata: Metadata = {
   title: 'Mutation Storyteller',
   description: 'Understand any genetic mutation in plain language. Powered by AlphaFold + Gemini.',
   icons: {
-    icon: '/icon.png',
-    apple: '/apple-icon.png',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [{ url: '/apple-icon.png', type: 'image/png' }],
   },
   openGraph: {
     title: 'Mutation Storyteller',
