@@ -1,5 +1,7 @@
 import { stepCountIs, streamText, tool } from 'ai';
-import { google } from '@ai-sdk/google';
+import { resolveProvider } from '@/lib/providers';
+import { clinicalRecord, type ClinVarRecord } from '@/lib/clinvar-record';
+import { researchEventResponse } from '@/lib/research-stream';
 import { z } from 'zod';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
 import { ChatRequestError, readChatRequest } from '@/lib/chat-request';
@@ -23,7 +25,6 @@ type UniProtProtein = {
 };
 type SearchResult = { esearchresult?: { idlist?: string[] } };
 type PubMedRecord = { title?: string; authors?: Array<{ name?: string }>; source?: string; pubdate?: string };
-type ClinVarRecord = { title?: string; clinical_significance?: { description?: string } };
 type AlphaFoldEntry = { pdbUrl?: string; cifUrl?: string; paeImageUrl?: string };
 const geneSchema = z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9][A-Za-z0-9-]*$/);
 const provenance = (sourceUrl: string) => ({ sourceUrl, retrievedAt: new Date().toISOString() });
@@ -51,9 +52,9 @@ export async function POST(req: Request) {
       status: known ? error.status : 400, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
     });
   }
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim()) {
-    return new Response('Research is not configured. Set GOOGLE_GENERATIVE_AI_API_KEY on the server.', { status: 503 });
-  }
+  let provider;
+  try { provider = resolveProvider(req.headers); }
+  catch (error) { return new Response((error as Error).message, { status: 400 }); }
 
   const controller = new AbortController();
   const signal = AbortSignal.any([req.signal, controller.signal, AbortSignal.timeout(55000)]);
@@ -64,9 +65,9 @@ export async function POST(req: Request) {
 
   try {
     const result = streamText({
-      // Preserve the existing model default; deployments can select another available model without editing code.
-      model: google(process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-pro-preview-customtools'),
+      model: provider.model,
       system: `${SYSTEM_PROMPT}
+Report depth: ${provider.depth === "detailed" ? "Write a detailed evidence review with clear headings, source-specific limitations, and unresolved questions. Use up to 900 words when the retrieved evidence supports it." : "Write a concise overview of up to 250 words."}
 
 EVIDENCE LIMITS:
 - An AlphaFold reference prediction is not a simulated mutant. Do not infer mutation effects or clinical pathogenicity from its shape or confidence alone.
@@ -76,7 +77,7 @@ EVIDENCE LIMITS:
       abortSignal: signal,
       maxRetries: 1,
       stopWhen: stepCountIs(8),
-      onError: ({ error }) => console.error('Research generation failed.', error),
+      onError: () => {},
       tools: {
         searchUniprot: tool({
           description: 'Search UniProt for protein information by gene name',
@@ -155,7 +156,7 @@ EVIDENCE LIMITS:
               return {
                 results: ids.flatMap((id) => {
                   const record = data.result?.[id];
-                  return record?.title ? [{ uid: id, title: record.title, clinicalSignificance: record.clinical_significance?.description, url: `https://www.ncbi.nlm.nih.gov/clinvar/variation/${id}/` }] : [];
+                  return record?.title ? [clinicalRecord(id, record)] : [];
                 }),
                 ...provenance(fallbackUrl),
               };
@@ -164,10 +165,13 @@ EVIDENCE LIMITS:
         }),
       },
     });
+    if (req.headers.get('x-rosie-stream') === 'events') {
+      return researchEventResponse(result.fullStream, () => controller.abort(), { provider: provider.provider, model: provider.modelId, depth: provider.depth });
+    }
     return researchTextResponse(result.fullStream, () => controller.abort());
   } catch (error) {
     controller.abort();
-    console.error('Could not start research generation.', error);
+    void error; // Never log provider errors: they may contain request credentials.
     return new Response('Research could not start. Please retry.', { status: 502 });
   }
 }

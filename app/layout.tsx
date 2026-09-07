@@ -3,8 +3,9 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://mutation-storyteller.vercel.app'),
   title: 'Mutation Storyteller',
-  description: 'Understand any genetic mutation in plain language. Powered by AlphaFold + Gemini.',
+  description: 'Explore human genetic variants with protein structures, source records, and AI-assisted evidence reviews.',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="antialiased">
         {children}
-        <Script src="https://3Dmol.org/build/3Dmol-min.js" strategy="beforeInteractive" />
+        <Script src="/vendor/3Dmol-2.5.5.min.js" strategy="beforeInteractive" />
       </body>
     </html>
   );

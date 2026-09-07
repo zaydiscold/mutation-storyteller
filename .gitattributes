@@ -1,0 +1,2 @@
+# Keep third-party distributions byte-for-byte, including their license formatting.
+public/vendor/* -whitespace
