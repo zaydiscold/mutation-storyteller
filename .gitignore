@@ -46,3 +46,6 @@ BUILD_PLAN.md
 AGENT_PROMPT.md
 AGENTS.md
 CLAUDE.md
+
+/test-results/
+/playwright-report/

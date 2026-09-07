@@ -15,6 +15,7 @@ interface MolViewer {
   render: () => void;
   resize: () => void;
   spin: (enabled: boolean) => void;
+  pngURI: () => string;
 }
 
 interface Mol3D {
@@ -30,6 +31,11 @@ export function ProteinViewer({ config, secretMode = false }: { config: ViewerCo
   const viewerInstance = useRef<MolViewer | null>(null);
   const [load, setLoad] = useState<LoadState | null>(null);
   const [retry, setRetry] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const [representation, setRepresentation] = useState('cartoon');
+  const [colorMode, setColorMode] = useState('spectrum');
+  const [residueInfo, setResidueInfo] = useState('');
+  const [sequence, setSequence] = useState<{ key: string; residues: Array<{ id: number; name: string }> } | null>(null);
   const [spikes, setSpikes] = useState<number[]>(() => Array(32).fill(10));
   const { pdbUrl = '', highlightResidue = 0, chain = '', mutationLabel = '' } = config ?? {};
   const key = JSON.stringify([pdbUrl, highlightResidue, chain, mutationLabel, retry]);
@@ -53,20 +59,25 @@ export function ProteinViewer({ config, secretMode = false }: { config: ViewerCo
       }
       controller.signal.throwIfAborted();
       if (disposed || !viewerRef.current) return;
-      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-      const accent = dark ? '#9b7dff' : '#FF8040';
-      const instance = viewerInstance.current ?? window.$3Dmol.createViewer(viewerRef.current, {
-        backgroundColor: dark ? '0x2a2a2a' : '0xF1E9D2',
-      });
-      viewer = instance;
-      viewerInstance.current = instance;
-      instance.spin(false);
-      instance.clear();
       const response = await fetch(pdbUrl, { signal: controller.signal, credentials: 'omit' });
       if (!response.ok) throw new Error(`Structure download failed (HTTP ${response.status}).`);
       const pdb = await response.text();
       if (disposed) return;
       if (!/^ATOM\s/m.test(pdb)) throw new Error('The download did not contain a valid protein structure.');
+      const residues = pdb.split('\n').filter(line => line.startsWith('ATOM') && line.slice(12, 16).trim() === 'CA' && line.slice(21, 22) === chain)
+        .map(line => ({ id: Number(line.slice(22, 26)), name: line.slice(17, 20).trim() }));
+      setSequence({ key, residues });
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const accent = dark ? '#9b7dff' : '#FF8040';
+      let instance = viewerInstance.current;
+      if (!instance) {
+        try { instance = window.$3Dmol.createViewer(viewerRef.current, { backgroundColor: dark ? '0x2a2a2a' : '0xF1E9D2' }); }
+        catch { throw new Error('3D rendering is unavailable in this browser. Enable hardware acceleration or try another browser. The reference sequence is available below.'); }
+      }
+      viewer = instance;
+      viewerInstance.current = instance;
+      instance.spin(false);
+      instance.clear();
       instance.addModel(pdb, 'pdb');
       const selection = { resi: highlightResidue, chain };
       if (!instance.selectedAtoms(selection).length) {
@@ -77,10 +88,12 @@ export function ProteinViewer({ config, secretMode = false }: { config: ViewerCo
       instance.addLabel(mutationLabel, {
         backgroundColor: accent, fontColor: 'white', fontSize: 14, showBackground: true,
       }, selection);
-      instance.zoomTo(selection);
-      instance.zoom(0.8);
+      const atoms = instance.selectedAtoms(selection) as Array<{ resn?: string; b?: number }>;
+      setResidueInfo(`${atoms[0]?.resn || 'Residue'} ${highlightResidue}, chain ${chain}${typeof atoms[0]?.b === 'number' ? ` · pLDDT ${atoms[0].b.toFixed(1)}` : ''}`);
+      instance.zoomTo();
+      instance.zoom(0.85);
       instance.render();
-      instance.spin(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      instance.spin(false);
       if (typeof ResizeObserver !== 'undefined') {
         resizeObserver = new ResizeObserver(() => { if (!disposed) instance.resize(); });
         resizeObserver.observe(viewerRef.current);
@@ -131,22 +144,43 @@ export function ProteinViewer({ config, secretMode = false }: { config: ViewerCo
     return () => window.cancelAnimationFrame(frameId);
   }, [secretMode, pdbUrl, highlightResidue, chain, status]);
 
+  useEffect(() => {
+    const viewer = viewerInstance.current;
+    if (!viewer || status !== 'ready') return;
+    const color = colorMode === 'confidence'
+      ? { colorscheme: { prop: 'b', gradient: 'roygb', min: 50, max: 90 } }
+      : { color: 'spectrum' };
+    viewer.setStyle({}, { [representation]: color });
+    viewer.setStyle({ resi: highlightResidue, chain }, { stick: { color: '#C34C16', radius: 0.3 }, [representation]: { color: '#C34C16' } });
+    viewer.render();
+    viewer.spin(spinning);
+  }, [representation, colorMode, status, highlightResidue, chain, spinning]);
+
   return (
-    <div className={config ? 'viewer-container' : 'viewer-empty'} style={{ position: 'relative' }} aria-busy={Boolean(config) && status === 'loading'}>
-      <div ref={viewerRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden', visibility: config ? 'visible' : 'hidden' }} />
-      {!config && <span>3d protein structure will appear here</span>}
-      {config && status === 'loading' && <p role="status" style={{ position: 'relative', padding: 16 }}>Loading reference structure...</p>}
-      {config && status === 'error' && (
-        <div role="alert" style={{ position: 'relative', padding: 16 }}>
-          <p>{load?.message}</p>
-          <button type="button" className="example-btn" onClick={() => setRetry((value) => value + 1)}>Retry structure</button>
+    <section aria-label="Protein viewer">
+      <div className={config ? 'viewer-container' : 'viewer-empty'} aria-busy={Boolean(config) && status === 'loading'}>
+        <div ref={viewerRef} className="molecule-canvas" style={{ visibility: config ? 'visible' : 'hidden' }} />
+        {!config && <span>Select a reference above or research a mutation.</span>}
+        {config && status === 'loading' && <p className="viewer-overlay" role="status">Loading reference structure...</p>}
+        {config && status === 'error' && <div className="viewer-overlay" role="alert"><p>{load?.message}</p><button type="button" className="example-btn" onClick={() => setRetry(value => value + 1)}>Retry structure</button></div>}
+        {secretMode && config && status === 'ready' && <div className="radio-overlay" aria-hidden="true">{spikes.map((height, index) => <div key={index} className="equalizer-bar" style={{ height: `${Math.min(64, height)}%` }} />)}</div>}
+      </div>
+      {config && <>
+        {sequence?.key === key && <details className="sequence-panel"><summary>Reference sequence · {sequence.residues.length} residues in chain {chain}</summary><p className="small-note">Residues present in this structure. The requested position is highlighted; this is the reference sequence.</p><div className="residue-strip">{sequence.residues.map((residue, i) => <span key={`${residue.id}-${i}`} className={residue.id === highlightResidue ? 'selected-residue' : ''} title={`Position ${residue.id}`}><small>{residue.id}</small>{residue.name}</span>)}</div></details>}
+        <p className="small-note" role="status">{status === 'ready' ? residueInfo : ''}</p>
+        <div className="control-row viewer-controls">
+          <button type="button" className="example-btn" disabled={status !== 'ready'} onClick={() => { viewerInstance.current?.zoomTo(); viewerInstance.current?.zoom(0.85); viewerInstance.current?.render(); }}>Whole protein</button>
+          <button type="button" className="example-btn" disabled={status !== 'ready'} onClick={() => { viewerInstance.current?.zoomTo({ resi: highlightResidue, chain }); viewerInstance.current?.zoom(0.65); viewerInstance.current?.render(); }}>Focus residue</button>
+          <button type="button" className="example-btn" disabled={status !== 'ready'} aria-pressed={spinning} onClick={() => { viewerInstance.current?.spin(!spinning); setSpinning(!spinning); }}>{spinning ? 'Pause rotation' : 'Rotate'}</button>
+          <button type="button" className="example-btn" disabled={status !== 'ready'} onClick={() => { const uri = viewerInstance.current?.pngURI(); if (uri) { const link = document.createElement('a'); link.href = uri; link.download = 'rosie-reference.png'; link.click(); } }}>Save image</button>
         </div>
-      )}
-      {secretMode && config && status === 'ready' && (
-        <div aria-hidden="true" style={{ pointerEvents: 'none', position: 'absolute', left: 12, right: 12, bottom: 12, height: 64, background: 'rgba(0,0,0,0.25)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'flex-end', gap: 2, padding: 8 }}>
-          {spikes.map((height, index) => <div key={index} className="equalizer-bar" style={{ height: `${Math.min(64, height)}%` }} />)}
+        <div className="settings-grid viewer-options">
+          <label>Representation<select aria-label="Representation" disabled={status !== 'ready'} value={representation} onChange={e => setRepresentation(e.target.value)}><option value="cartoon">Cartoon</option><option value="stick">Sticks</option><option value="line">Lines</option></select></label>
+          <label>Color<select aria-label="Color" disabled={status !== 'ready'} value={colorMode} onChange={e => setColorMode(e.target.value)}><option value="spectrum">Sequence position</option><option value="confidence">Prediction confidence</option></select></label>
         </div>
-      )}
-    </div>
+        {colorMode === 'confidence' && <p className="small-note">pLDDT: red ≤50 (low confidence), blue ≥90 (high confidence). Orange marks the requested residue. Confidence describes the reference prediction, not mutation impact.</p>}
+        <p className="small-note">Drag to rotate · scroll to zoom. Highlight marks a position on the reference protein; deleted residues remain visible in this reference.</p>
+      </>}
+    </section>
   );
 }

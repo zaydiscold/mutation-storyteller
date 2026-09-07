@@ -1,0 +1,16 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({
+  testDir: './tests/browser',
+  timeout: 45000,
+  workers: 1,
+  use: {
+    baseURL: process.env.ROSIE_TEST_URL || 'http://localhost:3107',
+    viewport: { width: 1440, height: 1000 },
+    channel: process.env.CI ? undefined : 'chrome',
+    launchOptions: { args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] },
+    screenshot: 'only-on-failure',
+  },
+  webServer: process.env.ROSIE_TEST_URL ? undefined : {
+    command: 'npm run dev -- --port 3107', url: 'http://localhost:3107', reuseExistingServer: !process.env.CI,
+  },
+});
