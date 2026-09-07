@@ -52,3 +52,13 @@ Both upstream distributions are preserved byte-for-byte. `.gitattributes` disabl
 The four bundled reference PDBs are actual structural data used in browser tests. They are reference predictions, not simulated mutant structures. The sequence fallback lists alpha-carbon residues present in the selected chain; it is not a claim that missing positions are absent from the biological protein. Confidence coloring describes reference prediction confidence, not mutation impact.
 
 See [reliability notes](RELIABILITY.md) for the verified test results and their limits, and [the README](../README.md) for commands and setup.
+
+## Production verification after merge
+
+On 2026-09-07, PRs #1 and #2 were merged, with application release merge commit `188ff29b0b75e146bc8c1dff46c9230cca40b34c`. Both Vercel projects reported successful production builds.
+
+- `GET https://mutation-storyteller.vercel.app/api/providers` returned HTTP 200, a configured hosted Google provider, and 15 free tool-capable OpenRouter models. No credentials were returned.
+- `ROSIE_TEST_URL=https://mutation-storyteller.vercel.app npm run test:browser` passed all seven browser tests in 16.6 seconds. These exercised the public deployment, including all four real bundled PDB files. Report-generation tests still use explicitly labeled fixtures.
+- `POST https://mutation-storyteller.vercel.app/api/providers` returned HTTP 502 with the sanitized message: “The provider rejected the key or request. Check your key and model in Model settings.” The hosted provider connection therefore remains unresolved; a successful live report is not verified.
+
+The code and production UI are deployed. Supplying a valid provider credential and checking an actual generated report remains the acceptance step that cannot be completed with the currently configured credentials.
