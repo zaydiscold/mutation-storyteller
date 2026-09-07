@@ -11,7 +11,7 @@
 - Validate HTTP JSON bodies and text-only user/assistant messages before starting a paid model request. System/tool/developer messages supplied by a caller are not accepted.
 - Normalize the legacy client messages to model text messages rather than mixing incompatible UI-message shapes from different AI SDK generations.
 - Forward abort signals and deadlines to model and source requests, check source HTTP responses, encode query parameters, and expose source URLs plus retrieval timestamps to the model.
-- Preserve the existing text-stream client protocol. Error/abort events, missing terminal events, empty output and truncated completions reject the response rather than silently looking successful.
+- Use structured NDJSON events for the current client, carrying actual source calls/results and model metadata alongside report text. Retain the legacy text-stream response for callers without the events header. Error/abort events, missing terminal events, empty output and truncated completions remain incomplete.
 - Keep source failures distinct from negative findings. Remind the model that PubMed titles are not full-text findings and reference structures do not establish mutation effects.
 
 ## Explicit limits
@@ -32,16 +32,19 @@ Body-size validation is not authentication, a global concurrency cap, or a spend
 
 ## Tests and verification
 
-`npm test` executes 30 regression tests against the real helper modules, with fake source responses and model-event iterators. It covers current-turn isolation, honest progress, viewer metadata, safe URL boundaries, message/body limits, multibyte UTF-8 decoding, stream failures/truncation/cancellation, and source HTTP/cancellation behavior.
+Verification on 2026-09-07 used Node.js 22 with installed dependencies:
 
-These are not browser, WebGL or live-provider tests. The local editing environment lacked network access and installed application dependencies, so the full Next.js typecheck/build and browser flow were not run there. Helper modules were independently checked with TypeScript; UI/route files were syntax-checked. CI is configured to run the full application checks, but its actual result must be reviewed separately.
+- `npm test`: 38 offline regression tests passed against the actual helper modules. These cover current-turn isolation, viewer metadata, message/body limits, UTF-8 decoding, cancellation, source failures, provider selection/error sanitization, structured events and ClinVar field compatibility.
+- `npm run test:browser`: seven Playwright browser tests passed in 19.8 seconds. All four actual bundled PDBs rendered with WebGL. Tests exercised viewer controls and PNG download, mobile width and input bounds, failed-download recovery, sequence fallback without WebGL, Stop and conversation reset, BYOK clearing on refresh, and report/source export.
+- `npm run typecheck`, `npm run lint`, and `npm run build` passed. `npm audit` reported zero vulnerabilities at verification time.
 
-Before merging, verify all four bundled examples, a new query after a prior answer, follow-up text, Stop and Retry, a missing API key, provider failure, blocked 3Dmol CDN, missing PDB, and rapid changes of viewer configuration in a real browser.
+The report rendering/export and failure tests use explicitly labeled provider fixtures. They verify application behavior, not scientific claims or successful live generation. Browser coverage uses local Chrome with software WebGL; it is not proof of every device, GPU or browser. CI runs unit, application and Chromium browser jobs; review its remote results separately.
+
+The existing local Gemini credential was present but rejected by a live Google models request (HTTP 400). Rosie's connection check exposed a sanitized rejection. No valid OpenRouter credential was available locally, so successful live report generation remains unverified. ClinVar ESummary returned HTTP 200 with the current germline and separate somatic classification fields. See [exact checks and reproduction](MODERNIZATION.md).
 
 ## Next priorities
 
-1. Align the client/server AI SDK generations in a separately tested migration and use structured, source-level progress events instead of the temporary request-level status.
-2. Render a source/evidence panel from validated tool results, not model-written assertions. Include retrieval time, record identifiers, actual evidence scope and explicit conflicts.
-3. Retrieve and validate abstracts before synthesizing study findings. Add citation-coverage and unsupported-claim evaluations.
-4. Add browser tests for streaming, failures, WebGL cleanup and mobile layout. Pin and test a supported 3Dmol release rather than relying on the moving CDN build.
-5. Evaluate retrieved-text prompt injection and provider-model availability. Check dependency advisories in a network-enabled environment before public deployment.
+1. Verify a complete live report with an accepted provider credential, including tool calls, source records, model attribution and report export. A successful connection check alone does not prove tool compatibility or report quality.
+2. Retrieve and validate abstracts before synthesizing study findings. Add citation-coverage and unsupported-claim evaluations.
+3. Evaluate retrieved-text prompt injection and compare report quality across available tool-capable models. Free routing can change the selected model between requests.
+4. Enforce hosting/provider rate and cost limits before unrestricted public hosted generation. Repeat dependency and deployment checks when shipping to production.
